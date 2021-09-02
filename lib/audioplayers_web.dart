@@ -63,7 +63,7 @@ class WrappedPlayer {
   }
 
   void resume() {
-    start(pausedAt ?? 0);
+    start(pausedAt! ?? 0);
   }
 
   void pause() {

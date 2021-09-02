@@ -43,13 +43,10 @@ enum ReleaseMode {
 enum AudioPlayerState {
   /// Stop has been called or an error occurred.
   STOPPED,
-
   /// Currently playing audio.
   PLAYING,
-
   /// Pause has been called.
   PAUSED,
-
   /// The audio successfully completed (reached the end).
   COMPLETED,
 }
@@ -96,7 +93,7 @@ void _backgroundCallbackDispatcher() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Reference to the onAudioChangeBackgroundEvent callback.
-  Function(AudioPlayerState)? onAudioChangeBackgroundEvent;
+  Function? onAudioChangeBackgroundEvent;
 
   // This is where the magic happens and we handle background events from the
   // native portion of the plugin. Here we message the audio notification data
@@ -108,18 +105,18 @@ void _backgroundCallbackDispatcher() {
 
       // PluginUtilities.getCallbackFromHandle performs a lookup based on the
       // handle we retrieved earlier.
-      final Function closure = PluginUtilities.getCallbackFromHandle(handle)!;
+      final Function? closure = PluginUtilities.getCallbackFromHandle(handle);
 
       if (closure == null) {
         print('Fatal Error: Callback lookup failed!');
         // exit(-1);
       }
-      return closure;
+      return closure!;
     }
 
     final Map<dynamic, dynamic> callArgs = call.arguments as Map;
     if (call.method == 'audio.onNotificationBackgroundPlayerStateChanged') {
-      onAudioChangeBackgroundEvent ?? _performCallbackLookup();
+      onAudioChangeBackgroundEvent ??= _performCallbackLookup();
       final String playerState = callArgs['value'];
       if (playerState == 'playing') {
         onAudioChangeBackgroundEvent!(AudioPlayerState.PLAYING);
@@ -182,9 +179,9 @@ class AudioPlayer {
   /// Enables more verbose logging.
   static bool logEnabled = false;
 
-  AudioPlayerState? _audioPlayerState;
+  late AudioPlayerState _audioPlayerState;
 
-  AudioPlayerState get state => _audioPlayerState!;
+  AudioPlayerState get state => _audioPlayerState;
 
   set state(AudioPlayerState state) {
     _playerStateController.add(state);
@@ -259,7 +256,8 @@ class AudioPlayer {
   /// You can use it on a progress bar, for instance.
   ///
   /// This is deprecated. Use [onAudioPositionChanged] instead.
-  late  TimeChangeHandler positionHandler;
+  @deprecated
+  TimeChangeHandler? positionHandler;
 
   /// Handler of changes on audio duration.
   ///
@@ -267,7 +265,8 @@ class AudioPlayer {
   /// (it might take a while to download or buffer it).
   ///
   /// This is deprecated. Use [onDurationChanged] instead.
-   late TimeChangeHandler durationHandler;
+  @deprecated
+  TimeChangeHandler? durationHandler;
 
   /// Handler of player completions.
   ///
@@ -294,7 +293,7 @@ class AudioPlayer {
   ///
   /// This is deprecated. Use [onPlayerError] instead.
   @deprecated
-  late ErrorHandler errorHandler;
+  ErrorHandler? errorHandler;
 
   /// An unique ID generated for this instance of [AudioPlayer].
   ///
@@ -303,11 +302,11 @@ class AudioPlayer {
 
   /// Current mode of the audio player. Can be updated at any time, but is going
   /// to take effect only at the next time you play the audio.
-  PlayerMode? mode ;
+  PlayerMode? mode;
 
   /// Creates a new instance and assigns an unique id to it.
   AudioPlayer({this.mode = PlayerMode.MEDIA_PLAYER, this.playerId}) {
-    this.mode ;
+    this.mode ??= PlayerMode.MEDIA_PLAYER;
     this.playerId ??= _uuid.v4();
     players[playerId!] = this;
 
@@ -315,11 +314,11 @@ class AudioPlayer {
       // Start the headless audio service. The parameter here is a handle to
       // a callback managed by the Flutter engine, which allows for us to pass
       // references to our callbacks between isolates.
-      final CallbackHandle handle =
-          PluginUtilities.getCallbackHandle(_backgroundCallbackDispatcher)!;
+      final CallbackHandle? handle =
+          PluginUtilities.getCallbackHandle(_backgroundCallbackDispatcher);
       assert(handle != null, 'Unable to lookup callback.');
       _invokeMethod('startHeadlessService', {
-        'handleKey': <dynamic>[handle.toRawHandle()],
+        'handleKey': <dynamic>[handle!.toRawHandle()],
       });
     }
   }
@@ -348,11 +347,11 @@ class AudioPlayer {
     // Start the headless audio service. The parameter here is a handle to
     // a callback managed by the Flutter engine, which allows for us to pass
     // references to our callbacks between isolates.
-    final CallbackHandle handle =
-        PluginUtilities.getCallbackHandle(_backgroundCallbackDispatcher)!;
+    final CallbackHandle? handle =
+        PluginUtilities.getCallbackHandle(_backgroundCallbackDispatcher);
     assert(handle != null, 'Unable to lookup callback.');
     _invokeMethod('startHeadlessService', {
-      'handleKey': <dynamic>[handle.toRawHandle()]
+      'handleKey': <dynamic>[handle!.toRawHandle()]
     });
 
     return;
@@ -368,10 +367,10 @@ class AudioPlayer {
     if (callback == null) {
       throw ArgumentError.notNull('callback');
     }
-    final CallbackHandle handle = PluginUtilities.getCallbackHandle(callback)!;
+    final CallbackHandle? handle = PluginUtilities.getCallbackHandle(callback);
 
     await _invokeMethod('monitorNotificationStateChanges', {
-      'handleMonitorKey': <dynamic>[handle.toRawHandle()]
+      'handleMonitorKey': <dynamic>[handle!.toRawHandle()]
     });
 
     return true;
@@ -395,9 +394,6 @@ class AudioPlayer {
     bool recordingActive = false,
   }) async {
     isLocal ??= isLocalUrl(url);
-    volume ;
-    respectSilence ;
-    stayAwake ;
 
     final int result = await _invokeMethod('play', {
       'url': url,
@@ -430,9 +426,6 @@ class AudioPlayer {
     bool duckAudio = false,
     bool recordingActive = false,
   }) async {
-    volume;
-    respectSilence ;
-    stayAwake;
 
     if (!Platform.isAndroid) {
       throw PlatformException(
@@ -608,7 +601,7 @@ class AudioPlayer {
     return _invokeMethod('getCurrentPosition');
   }
 
-  static Future platformCallHandler(MethodCall call) async {
+  static Future<void> platformCallHandler(MethodCall call) async {
     try {
       _doHandlePlatformCall(call);
     } catch (ex) {
@@ -616,12 +609,12 @@ class AudioPlayer {
     }
   }
 
-  static Future? _doHandlePlatformCall(MethodCall call) async {
+  static Future<void> _doHandlePlatformCall(MethodCall call) async {
     final Map<dynamic, dynamic> callArgs = call.arguments as Map;
     _log('_platformCallHandler call ${call.method} $callArgs');
 
     final playerId = callArgs['playerId'] as String;
-    final AudioPlayer player = players[playerId]!;
+    final AudioPlayer? player = players[playerId];
 
     if (!kReleaseMode && Platform.isAndroid && player == null) {
       final oldPlayer = AudioPlayer(playerId: playerId);
@@ -643,30 +636,31 @@ class AudioPlayer {
       case 'audio.onDuration':
         Duration newDuration = Duration(milliseconds: value);
         player._durationController.add(newDuration);
-         player.durationHandler.call(newDuration);
+        // ignore: deprecated_member_use_from_same_package
+        player.durationHandler?.call(newDuration);
         break;
       case 'audio.onCurrentPosition':
         Duration newDuration = Duration(milliseconds: value);
         player._positionController.add(newDuration);
         // ignore: deprecated_member_use_from_same_package
-        player.positionHandler.call(newDuration);
+        player.positionHandler?.call(newDuration);
         break;
       case 'audio.onComplete':
         player.state = AudioPlayerState.COMPLETED;
         player._completionController.add(null);
         // ignore: deprecated_member_use_from_same_package
-        player.completionHandler!.call();
+        player.completionHandler?.call();
         break;
       case 'audio.onSeekComplete':
         player._seekCompleteController.add(value);
         // ignore: deprecated_member_use_from_same_package
-        player.seekCompleteHandler!.call(value);
+        player.seekCompleteHandler?.call(value);
         break;
       case 'audio.onError':
         player.state = AudioPlayerState.STOPPED;
         player._errorController.add(value);
         // ignore: deprecated_member_use_from_same_package
-        player.errorHandler.call(value);
+        player.errorHandler?.call(value);
         break;
       case 'audio.onGotNextTrackCommand':
         player._commandController.add(PlayerControlCommand.NEXT_TRACK);
